@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Polygon Clock with Week and Lunar Rings (28 segments)</title>
+<style>
+  @import url('https://fonts.cdnfonts.com/css/seven-segment');
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    background: rgb(74, 74, 74);
+  }
+  svg {
+    width: 680px;
+    height: 680px;
+    background: transparent;
+    display: block;
+  }
+  polygon {
+    fill: none;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  /* Base polygons: consistent stroke widths and HSLA colors */
+  #baseOuter {
+    stroke: hsla(0, 0%, 50%, 1);
+    stroke-width: 0.5;
+  }
+  #progressOuter {
+    stroke: hsla(30, 100%, 50%, 1);
+    stroke-width: 3;
+    transition: stroke-dashoffset 0.1s linear;
+  }
+  #baseInner {
+    stroke: hsla(0, 0%, 50%, 1);
+    stroke-width: 0.5;
+  }
+  #progressInner {
+    stroke: hsla(200, 100%, 50%, 1);
+    stroke-width: 1.5;
+    transition: stroke-dashoffset 0.1s linear;
+  }
+  #baseHour {
+    stroke: hsla(120, 70%, 50%, 1);
+    stroke-width: 0.5;
+  }
+  #progressHour {
+    stroke: hsla(120, 100%, 70%, 1);
+    stroke-width: 3;
+    transition: stroke-dashoffset 0.1s linear;
+  }
+  #baseWeek {
+    stroke: hsla(280, 80%, 60%, 1);
+    stroke-width: 0.5;
+  }
+  #progressWeek {
+    stroke: hsla(280, 100%, 75%, 1);
+    stroke-width: 5;
+    transition: stroke-dashoffset 0.1s linear;
+  }
+  /* Lunar ring styles */
+  #baseLunar {
+    stroke: hsla(45, 70%, 75%, 1);
+    stroke-width: 0.5;
+  }
+  #progressLunar {
+    stroke: hsla(45, 90%, 60%, 1);
+    stroke-width: 4;
+    transition: stroke-dashoffset 0.1s linear;
+  }
+  #dayHalf {
+    fill: hsla(45, 80%, 60%, 0.22);
+    stroke: none;
+  }
+  #nightHalf {
+    fill: hsla(220, 50%, 15%, 0.35);
+    stroke: none;
+  }
+  #sunIcon {
+    fill: #f9d71c;
+    stroke: #fff;
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 6px #f9d71c);
+  }
+  #moonIcon {
+    fill: #ddd;
+    stroke: #aaa;
+    stroke-width: 1;
+    filter: drop-shadow(0 0 3px #aaa);
+  }
+  text#digitalClock {
+    font-family: 'Seven Segment', monospace;
+    font-size: 60px;
+    fill: hsla(180, 100%, 80%, 1);
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 680 680" aria-label="Rotated polygon loader" role="img" preserveAspectRatio="xMidYMid meet">
+  <g id="rotatedGroup" transform="rotate(180 340 340)">
+    <polygon id="dayHalf" points="" />
+    <polygon id="nightHalf" points="" />
+    <polygon id="baseLunar" points="" />
+    <polygon id="progressLunar" points="" />
+    <polygon id="baseWeek" points="" />
+    <polygon id="progressWeek" points="" />
+    <polygon id="baseOuter" points="" />
+    <polygon id="progressOuter" points="" />
+    <polygon id="baseInner" points="" />
+    <polygon id="progressInner" points="" />
+    <polygon id="baseHour" points="" />
+    <polygon id="progressHour" points="" />
+    <circle id="sunIcon" r="12" cx="0" cy="0" />
+    <circle id="moonIcon" r="10" cx="0" cy="0" />
+  </g>
+  <text id="digitalClock" x="340" y="340" text-anchor="middle" dominant-baseline="middle">00:00:00</text>
+</svg>
+
+<script>
+  const elements = {
+    baseOuter: document.getElementById('baseOuter'),
+    progressOuter: document.getElementById('progressOuter'),
+    baseInner: document.getElementById('baseInner'),
+    progressInner: document.getElementById('progressInner'),
+    baseHour: document.getElementById('baseHour'),
+    progressHour: document.getElementById('progressHour'),
+    baseWeek: document.getElementById('baseWeek'),
+    progressWeek: document.getElementById('progressWeek'),
+    baseLunar: document.getElementById('baseLunar'),
+    progressLunar: document.getElementById('progressLunar'),
+    digitalClock: document.getElementById('digitalClock'),
+    dayHalf: document.getElementById('dayHalf'),
+    nightHalf: document.getElementById('nightHalf'),
+    sunIcon: document.getElementById('sunIcon'),
+    moonIcon: document.getElementById('moonIcon')
+  };
+
+  const CONFIG = {
+    center: { x: 340, y: 340 },
+    polygons: {
+      outer: { sides: 24, radius: 250 },
+      inner: { sides: 6, radius: 210 },
+      hour: { sides: 12, radius: 225 },
+      week: { sides: 14, radius: 275 },
+      lunar: { sides: 28, radius: 310 } // Changed to 28 sides
+    }
+  };
+
+  function generatePolygonPoints(sides, radius, center) {
+    const points = [];
+    const angleStep = (2 * Math.PI) / sides;
+    const startAngle = (3 * Math.PI) / 2; // bottom vertex angle
+    for (let i = 0; i < sides; i++) {
+      const angle = startAngle - i * angleStep;
+      points.push([
+        center.x + radius * Math.cos(angle),
+        center.y + radius * Math.sin(angle)
+      ]);
+    }
+    return points;
+  }
+
+  function pointsToString(points) {
+    return points.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(' ');
+  }
+
+  function closePoints(points) {
+    return [...points, points[0]];
+  }
+
+  function calculatePerimeter(points) {
+    let length = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const dx = points[i+1][0] - points[i][0];
+      const dy = points[i+1][1] - points[i][1];
+      length += Math.hypot(dx, dy);
+    }
+    return length;
+  }
+
+  // Setup polygons and cache data
+  const polygons = {};
+  function setupPolygon(id, sides, radius) {
+    const pts = generatePolygonPoints(sides, radius, CONFIG.center);
+    const closedPts = closePoints(pts);
+    const perimeter = calculatePerimeter(closedPts);
+    elements[id].setAttribute('points', pointsToString(pts));
+    return { points: pts, closedPoints: closedPts, perimeter };
+  }
+
+  polygons.outer = setupPolygon('baseOuter', CONFIG.polygons.outer.sides, CONFIG.polygons.outer.radius);
+  polygons.inner = setupPolygon('baseInner', CONFIG.polygons.inner.sides, CONFIG.polygons.inner.radius);
+  polygons.hour = setupPolygon('baseHour', CONFIG.polygons.hour.sides, CONFIG.polygons.hour.radius);
+  polygons.week = setupPolygon('baseWeek', CONFIG.polygons.week.sides, CONFIG.polygons.week.radius);
+  polygons.lunar = setupPolygon('baseLunar', CONFIG.polygons.lunar.sides, CONFIG.polygons.lunar.radius);
+
+  function setupProgress(id, closedPoints, perimeter) {
+    elements[id].setAttribute('points', pointsToString(closedPoints));
+    elements[id].style.strokeDasharray = perimeter;
+    elements[id].style.strokeDashoffset = perimeter;
+  }
+
+  setupProgress('progressOuter', polygons.outer.closedPoints, polygons.outer.perimeter);
+  setupProgress('progressInner', polygons.inner.closedPoints, polygons.inner.perimeter);
+  setupProgress('progressHour', polygons.hour.closedPoints, polygons.hour.perimeter);
+  setupProgress('progressWeek', polygons.week.closedPoints, polygons.week.perimeter);
+  setupProgress('progressLunar', polygons.lunar.closedPoints, polygons.lunar.perimeter);
+
+  // Day/Night halves setup
+  function drawDayNightHalves() {
+    const dayVertices = polygons.outer.points.slice(6, 19);
+    dayVertices.push([CONFIG.center.x, CONFIG.center.y]);
+    dayVertices.push(polygons.outer.points[6]);
+    elements.dayHalf.setAttribute('points', pointsToString(dayVertices));
+
+    const nightVertices = polygons.outer.points.slice(18).concat(polygons.outer.points.slice(0,7));
+    nightVertices.push([CONFIG.center.x, CONFIG.center.y]);
+    nightVertices.push(polygons.outer.points[18]);
+    elements.nightHalf.setAttribute('points', pointsToString(nightVertices));
+  }
+  drawDayNightHalves();
+
+  // Helper: Get point at fraction along polygon perimeter
+  function getPointAtFraction(closedPoints, perimeter, fraction) {
+    const targetLength = fraction * perimeter;
+    let accumulated = 0;
+    for (let i = 0; i < closedPoints.length - 1; i++) {
+      const p1 = closedPoints[i];
+      const p2 = closedPoints[i + 1];
+      const segmentLength = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+      if (accumulated + segmentLength >= targetLength) {
+        const remain = targetLength - accumulated;
+        const ratio = remain / segmentLength;
+        return [
+          p1[0] + (p2[0] - p1[0]) * ratio,
+          p1[1] + (p2[1] - p1[1]) * ratio
+        ];
+      }
+      accumulated += segmentLength;
+    }
+    return closedPoints[0];
+  }
+
+  // Lunar phase calculation (simple approximation)
+  // Returns lunar age in days (0 to ~29.53)
+  function getLunarAge(date) {
+    const newMoonRef = Date.UTC(2000, 0, 6, 18, 14);
+    const synodicMonth = 29.530588853;
+
+    const nowUTC = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(),
+                           date.getUTCHours(), date.getUTCMinutes(), date.getUTCSeconds(), date.getUTCMilliseconds());
+
+    let daysSinceNewMoon = (nowUTC - newMoonRef) / (1000 * 60 * 60 * 24);
+    daysSinceNewMoon = daysSinceNewMoon % synodicMonth;
+    if (daysSinceNewMoon < 0) daysSinceNewMoon += synodicMonth;
+    return daysSinceNewMoon;
+  }
+
+  // Format time as HH:MM:SS
+  function formatTime(date) {
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
+    const s = date.getSeconds().toString().padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  }
+
+  // Week progress fraction (half-day segments)
+  function getWeekFraction(date) {
+    const dayOfWeek = date.getDay();
+    const hour = date.getHours();
+    const minutes = date.getMinutes();
+    const seconds = date.getSeconds();
+    const ms = date.getMilliseconds();
+
+    const halfDayIndex = dayOfWeek * 2 + (hour >= 12 ? 1 : 0);
+    const fractionInHalfDay = ((hour % 12) + minutes / 60 + seconds / 3600 + ms / 3600000) / 12;
+
+    return (halfDayIndex + fractionInHalfDay) / 14;
+  }
+
+  // Update all progress bars and icons
+  function updateProgresses(date) {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const seconds = date.getSeconds();
+    const milliseconds = date.getMilliseconds();
+
+    const hourFraction = (hours + minutes / 60 + seconds / 3600 + milliseconds / 3600000) / 24;
+    const secondFraction = (seconds + milliseconds / 1000) / 60;
+    const minuteFraction = (minutes + seconds / 60 + milliseconds / 60000) / 60;
+    const weekFraction = getWeekFraction(date);
+
+    // Lunar fraction based on lunar age, normalized to 28 segments
+    const lunarAge = getLunarAge(date);
+    const lunarFraction = lunarAge / 28; // Note: lunarAge max ~29.53, but we map to 28 segments
+
+    elements.progressOuter.style.strokeDashoffset = polygons.outer.perimeter * (1 - hourFraction);
+    elements.progressInner.style.strokeDashoffset = polygons.inner.perimeter * (1 - secondFraction);
+    elements.progressHour.style.strokeDashoffset = polygons.hour.perimeter * (1 - minuteFraction);
+    elements.progressWeek.style.strokeDashoffset = polygons.week.perimeter * (1 - weekFraction);
+    elements.progressLunar.style.strokeDashoffset = polygons.lunar.perimeter * (1 - lunarFraction);
+
+    const [sunX, sunY] = getPointAtFraction(polygons.outer.closedPoints, polygons.outer.perimeter, hourFraction);
+    elements.sunIcon.setAttribute('cx', sunX);
+    elements.sunIcon.setAttribute('cy', sunY);
+
+    const [moonX, moonY] = getPointAtFraction(polygons.lunar.closedPoints, polygons.lunar.perimeter, lunarFraction);
+    elements.moonIcon.setAttribute('cx', moonX);
+    elements.moonIcon.setAttribute('cy', moonY);
+  }
+
+  // Main update loop
+  function updateClockAndProgress() {
+    const now = new Date();
+    elements.digitalClock.textContent = formatTime(now);
+    updateProgresses(now);
+  }
+
+  updateClockAndProgress();
+  setInterval(updateClockAndProgress, 100);
+</script>
+
+</body>
+</html>
